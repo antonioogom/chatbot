@@ -1,2 +1,1 @@
-web: gunicorn envio:app
-web: gunicorn post:app
+web: gunicorn projeto:app
