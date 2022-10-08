@@ -4,6 +4,10 @@ from requests.structures import CaseInsensitiveDict
 
 app = Flask(__name__)
 
+@app.route('/webhook2', methods = ['POST'])
+def webhook2():
+    insertUpdateDeleteBanco("INSERT INTO LOG (OK) VALUES ('OK')")
+
 @app.route('/webhook', methods = ['POST'])
 def webhook():
     dicionario = request.get_json()
