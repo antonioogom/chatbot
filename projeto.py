@@ -6,7 +6,10 @@ app = Flask(__name__)
 
 @app.route('/webhook2', methods = ['POST'])
 def webhook2():
-    insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('APENAS LOG WEBHOOK2', '1')")
+    
+    dicionario = request.get_json()
+    #insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('APENAS LOG WEBHOOK2', '1')")
+    insertUpdateDeleteBanco('INSERT INTO LOG (RETORNO, ETAPA) VALUES ("' + str(dicionario) + '", "1")')
 
     return "ok"
 
