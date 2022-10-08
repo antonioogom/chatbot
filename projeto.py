@@ -6,7 +6,7 @@ app = Flask(__name__)
 
 @app.route('/webhook2', methods = ['POST'])
 def webhook2():
-    insertUpdateDeleteBanco("INSERT INTO LOG (OK) VALUES ('OK')")
+    insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('APENAS LOG WEBHOOK2', '1')")
 
     return "ok"
 
@@ -78,7 +78,7 @@ def webhook():
         #TALVEZ UNIFICAR A FUNÇÃO CONTINUA COM A ENTRA
         #TA DEMORANDO 2 SEGUNDOS PRA RESPONDER, MELHORAR ISSO
 
-    return str(strSequenciaAtual)
+    return "OK"
 
 #Funções de fluxo
 
