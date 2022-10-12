@@ -1,3 +1,4 @@
+from asyncore import loop
 from flask import Flask, request
 import requests, mysql.connector
 from requests.structures import CaseInsensitiveDict
@@ -12,6 +13,30 @@ def webhook2():
     insertUpdateDeleteBanco('INSERT INTO LOG (RETORNO, ETAPA) VALUES ("' + str(dicionario) + '", "1")')
 
     return "ok"
+
+@app.route('/webhook3', methods = ['POST'])
+def webhook3():
+    sucesso = "nao"
+    numQtdeVezes = 10
+    con = mysql.connector.connect(host='botuni9.c3cupjqiyqbn.sa-east-1.rds.amazonaws.com', database='ChatBot', user='admin', password='7pPdu#GSX.2sYG')
+
+    if con.is_connected():
+        cursor = con.cursor()
+        for i in range(numQtdeVezes):
+            cursor.execute("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('Loop de testes: " + str(i) + "', '1')")
+            con.commit()
+
+        cursor.execute("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('-----------------', '1')")
+
+        cursor.close()
+        con.close()
+
+        for i in range(numQtdeVezes):
+            insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('Loop de testes: " + str(i) + "', '1')")
+
+        sucesso = "sim"
+
+    return sucesso
 
 @app.route('/webhook', methods = ['POST'])
 def webhook():
