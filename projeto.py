@@ -16,6 +16,7 @@ def webhook2():
 @app.route('/webhook', methods = ['POST'])
 def webhook():
     dicionario = request.get_json()
+    insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('Inicio webhook', '1')")
 
     #Coleta dados da mensagem
     strMensagem  = str(dicionario['result'][0]['message']['text'])
@@ -41,10 +42,12 @@ def webhook():
 
         #Guarda a mensagem no BD
         salvaMensagem(strChatId, strMensagem, strNome)
+        insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('Guardou mensagem no banco de dados', '1')")
 
     else:
         #Guarda a mensagem no BD
         salvaMensagem(strChatId, strMensagem, strNome)
+        insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('Guardou mensagem no banco de dados', '1')")
 
         #Verifica resposta recebida
         #Traz todas as respostas aceitas daquela sequencia/fluxo atual
