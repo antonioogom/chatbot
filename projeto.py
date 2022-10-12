@@ -15,18 +15,22 @@ def webhook2():
 
 @app.route('/webhook', methods = ['POST'])
 def webhook():
+    insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('INICIO WEBHOOK', '1')")
     dicionario = request.get_json()
 
     #Coleta dados da mensagem
-    strMensagem  = str(dicionario['message']['text'])
-    strNome      = str(dicionario['message']['from']['first_name'])
-    strChatId    = str(dicionario['message']['from']['id'])
+    strMensagem  = str(dicionario['result'][0]['message']['text'])
+    insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('" + strMensagem + "', '1')")
+    strNome      = str(dicionario['result'][0]['message']['from']['first_name'])
+    strChatId    = str(dicionario['result'][0]['message']['from']['id'])
 
     #Verifica se é a primeira mensagem
     bPrimeiraMensagem = True
+    insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('VERIFICANDO SE E A PRIMEIRA MSG', '1')")
     tabFluxoAtual     = retornaFluxoAtual(strChatId)
 
     if len(tabFluxoAtual) > 0:
+        insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('É A PRIMEIRA MENSAGEM', '1')")
         bPrimeiraMensagem = False
         strFluxoAtual     = str(tabFluxoAtual[0][0])
         strSequenciaAtual = str(tabFluxoAtual[0][1])
@@ -35,20 +39,28 @@ def webhook():
     #bExisteCadastro = verificaCadastro(strChatId)
 
     if bPrimeiraMensagem:
+        insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('PREPARANDO PARA ENTRAR NO FLUXO 1', '1')")
         entraFluxoConversa(strChatId, "1")
+        insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('ENTROU NO FLUXO 1', '1')")
         strFluxoAtual     = 1
         strSequenciaAtual = 1
 
         #Guarda a mensagem no BD
+        insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('SALVANDO MENSAGEM NO BANCO DE DADOS', '1')")
         salvaMensagem(strChatId, strMensagem, strNome)
+        insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('MENSAGEM SALVA NO BANCO DE DADOS', '1')")
 
     else:
         #Guarda a mensagem no BD
+        insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('SALVANDO MENSAGEM NO BANCO DE DADOS', '1')")
         salvaMensagem(strChatId, strMensagem, strNome)
+        insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('MENSAGEM SALVA NO BANCO DE DADOS', '1')")
 
         #Verifica resposta recebida
         #Traz todas as respostas aceitas daquela sequencia/fluxo atual
+        insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('TRAZENDO MSGS ACEITAS DO BD', '1')")
         tabRespostas = selectBanco("SELECT RESPACEITA, IDFLUXOREDIREC FROM RESPOSTAFLUXO WHERE IDFLUXO = '" + strFluxoAtual + "' AND NUMSEQ = '" + strSequenciaAtual + "';")
+        insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('MENSAGENS ACEITAS CARREGADO', '1')")
         bRespostaAceita = False
 
         #Loop nas respostas aceitas verificando se ela é igual a resposta recebida
