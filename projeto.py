@@ -16,12 +16,11 @@ def webhook2():
 @app.route('/webhook', methods = ['POST'])
 def webhook():
     dicionario = request.get_json()
-    insertUpdateDeleteBanco("INSERT INTO LOG (RETORNO, ETAPA) VALUES ('Inicio webhook', '1')")
 
     #Coleta dados da mensagem
-    strMensagem  = str(dicionario['result'][0]['message']['text'])
-    strNome      = str(dicionario['result'][0]['message']['from']['first_name'])
-    strChatId    = str(dicionario['result'][0]['message']['from']['id'])
+    strMensagem  = str(dicionario['message']['text'])
+    strNome      = str(dicionario['message']['from']['first_name'])
+    strChatId    = str(dicionario['message']['from']['id'])
 
     #Verifica se é a primeira mensagem
     bPrimeiraMensagem = True
