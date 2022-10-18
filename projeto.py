@@ -11,6 +11,16 @@ objConexao = mysql.connector.connect(host='botuni9.c3cupjqiyqbn.sa-east-1.rds.am
 
 #Páginas ------------------------------------------------------------
 
+@app.route('/webhook2', methods = ['POST'])
+def webhook2():
+    dicionario = request.get_json()
+    strChatId  = str(dicionario['message']['from']['id'])
+
+    tabFluxoAtual     = retornaFluxoAtual(strChatId)
+
+    return str(tabFluxoAtual)
+    #return tabFluxoAtual
+
 @app.route('/webhook', methods = ['POST'])
 def webhook():
 
@@ -70,10 +80,9 @@ def webhook():
         elif len(tabRespostas) == 0:
             entraFluxoConversa(strChatId, "1")
         else:
-            enviaMsg(strChatId, 'Nao entendi sua resposta, por favor responda corretamente: ')
+            enviaMsg(strChatId, 'Nao entendi sua resposta, por favor responda corretamente')
 
-    if objConexao.is_connected():
-        objConexao.close()
+        
 
     return "OK"
 
@@ -162,7 +171,6 @@ def insertUpdateDeleteBanco(objConexao, strQuery):
         cursor.close()
         
     return "ok"
-
 
 
 if __name__ == "__main__":
