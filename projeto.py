@@ -1,4 +1,3 @@
-from asyncore import loop
 from flask import Flask, request
 import requests, mysql.connector
 from requests.structures import CaseInsensitiveDict
@@ -11,16 +10,6 @@ objConexao = mysql.connector.connect(host='botuni9.c3cupjqiyqbn.sa-east-1.rds.am
 
 #Páginas ------------------------------------------------------------
 
-@app.route('/webhook2', methods = ['POST'])
-def webhook2():
-    dicionario = request.get_json()
-    strChatId  = str(dicionario['message']['from']['id'])
-
-    tabFluxoAtual     = retornaFluxoAtual(strChatId)
-
-    return str(tabFluxoAtual)
-    #return tabFluxoAtual
-
 @app.route('/webhook', methods = ['POST'])
 def webhook():
 
@@ -31,30 +20,28 @@ def webhook():
     strNome      = str(dicionario['message']['from']['first_name'])
     strChatId    = str(dicionario['message']['from']['id'])
 
+    #Guarda a mensagem no BD
+    guardaMensagem(strChatId, strMensagem, strNome)
+
     #Verifica se é a primeira mensagem
     bPrimeiraMensagem = True
     tabFluxoAtual     = retornaFluxoAtual(strChatId)
 
-    if len(tabFluxoAtual) > 0:
+    if len(tabFluxoAtual) > 0:        
         bPrimeiraMensagem = False
         strFluxoAtual     = str(tabFluxoAtual[0][0])
         strSequenciaAtual = str(tabFluxoAtual[0][1])
 
     #Verifica se está cadastrado
-    #bExisteCadastro = verificaCadastro(strChatId)
+    bExisteCadastro = verificaCadastro(strChatId)
 
     if bPrimeiraMensagem:
+        #Entra no primeiro fluxo de mensagem
         entraFluxoConversa(strChatId, "1")
         strFluxoAtual     = 1
         strSequenciaAtual = 1
 
-        #Guarda a mensagem no BD
-        salvaMensagem(strChatId, strMensagem, strNome)
-
     else:
-        #Guarda a mensagem no BD
-        salvaMensagem(strChatId, strMensagem, strNome)
-
         #Verifica resposta recebida
         #Traz todas as respostas aceitas daquela sequencia/fluxo atual
         tabRespostas = selectBanco(objConexao, "SELECT RESPACEITA, IDFLUXOREDIREC FROM RESPOSTAFLUXO WHERE IDFLUXO = '" + strFluxoAtual + "' AND NUMSEQ = '" + strSequenciaAtual + "';")
@@ -73,32 +60,36 @@ def webhook():
                     bRespostaAceita = True
                     break
 
-
         if bRespostaAceita:
+            
             #Responde e continua o fluxo
+            if strFluxoAtual == '5' and strSequenciaAtual == '2':
+                insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATO_LINHA (IDCTT, IDLINHA) VALUES ('" + strChatId + "', '" + strMensagem + "');")
+
+            if strFluxoAtual == '5' and strSequenciaAtual == '4':
+                insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATO_AGENDAMENTOS (IDCTT, HORA) VALUES ('" + strChatId + "', '" + strMensagem + "');")
+
             continuaFluxo(strChatId)
         elif len(tabRespostas) == 0:
             entraFluxoConversa(strChatId, "1")
         else:
             enviaMsg(strChatId, 'Nao entendi sua resposta, por favor responda corretamente')
 
-        
-
-    return "OK"
+    return "2"
 
 #Funções de fluxo ---------------------------------------------------
 
 def verificaCadastro(strChatId):
     bExisteCadastro = False
     
-    tabBancoDados = selectBanco(objConexao, "SELECT * FROM AGENDAMENTOS WHERE IDCTT = '" + strChatId + "';")
+    tabBancoDados = selectBanco(objConexao, "SELECT * FROM CONTATO_AGENDAMENTOS WHERE IDCTT = '" + strChatId + "';")
 
     if len(tabBancoDados) > 0:
         bExisteCadastro = True
     
     return bExisteCadastro
 
-def salvaMensagem(strChatId, strMensagem, strNomeCtt):
+def guardaMensagem(strChatId, strMensagem, strNomeCtt):
     insertUpdateDeleteBanco(objConexao, "INSERT INTO MENSAGENS_RECEBIDAS (IDCTT, MENSAGEM, NOMECTT) VALUES ('" + strChatId + "', '" + strMensagem + "', '" + strNomeCtt + "');")
 
 def entraFluxoConversa(strChatId, strIDFluxo):
