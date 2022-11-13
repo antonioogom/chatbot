@@ -127,13 +127,18 @@ def retornaFluxoAtual(strChatId):
 
 def enviaMsg(strChatId, strMensagem):
 
-    url = "https://api.telegram.org/bot5751250760:AAG6Fs7zjgKKG8u9S_1BkO53Tn6z5u5C4XI/sendMessage"
+    try:
+        url = "https://api.telegram.org/bot5751250760:AAG6Fs7zjgKKG8u9S_1BkO53Tn6z5u5C4XI/sendMessage"
 
-    headers = CaseInsensitiveDict()
-    headers["Content-Type"] = "application/json"
-    data = '{"chat_id":"' + strChatId + '","text":"' + strMensagem + '"}'
+        headers = CaseInsensitiveDict()
+        headers["Content-Type"] = "application/json"
+        data = '{"chat_id":"' + strChatId + '","text":"' + strMensagem + '"}'
+        data = data.encode("utf-8")
 
-    requests.post(url, headers=headers, data=data)
+        resposta = requests.post(url, headers=headers, data=data)
+        insertUpdateDeleteBanco(objConexao, "INSERT INTO LOG (RETORNO, ETAPA) VALUES ('" + str(resposta) + "', 'Sucesso');")
+    except:
+        insertUpdateDeleteBanco(objConexao, "INSERT INTO LOG (RETORNO, ETAPA) VALUES ('Ocorreu um erro', 'Erro');")
 
     return "ok"
 
