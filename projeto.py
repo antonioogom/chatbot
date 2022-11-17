@@ -13,69 +13,72 @@ objConexao = mysql.connector.connect(host='botuni9.c3cupjqiyqbn.sa-east-1.rds.am
 @app.route('/webhook', methods = ['POST'])
 def webhook():
 
-    dicionario = request.get_json()
+    try:
+        dicionario = request.get_json()
 
-    #Coleta dados da mensagem
-    strMensagem  = str(dicionario['message']['text'])
-    strNome      = str(dicionario['message']['from']['first_name'])
-    strChatId    = str(dicionario['message']['from']['id'])
+        #Coleta dados da mensagem
+        strMensagem  = str(dicionario['message']['text'])
+        strNome      = str(dicionario['message']['from']['first_name'])
+        strChatId    = str(dicionario['message']['from']['id'])
 
-    #Guarda a mensagem no BD
-    guardaMensagem(strChatId, strMensagem, strNome)
+        #Guarda a mensagem no BD
+        guardaMensagem(strChatId, strMensagem, strNome)
 
-    #Verifica se é a primeira mensagem
-    bPrimeiraMensagem = True
-    tabFluxoAtual     = retornaFluxoAtual(strChatId)
+        #Verifica se é a primeira mensagem
+        bPrimeiraMensagem = True
+        tabFluxoAtual     = retornaFluxoAtual(strChatId)
 
-    if len(tabFluxoAtual) > 0:        
-        bPrimeiraMensagem = False
-        strFluxoAtual     = str(tabFluxoAtual[0][0])
-        strSequenciaAtual = str(tabFluxoAtual[0][1])
+        if len(tabFluxoAtual) > 0:        
+            bPrimeiraMensagem = False
+            strFluxoAtual     = str(tabFluxoAtual[0][0])
+            strSequenciaAtual = str(tabFluxoAtual[0][1])
 
-    #Verifica se está cadastrado
-    bExisteCadastro = verificaCadastro(strChatId)
+        #Verifica se está cadastrado
+        bExisteCadastro = verificaCadastro(strChatId)
 
-    if bPrimeiraMensagem:
-        #Entra no primeiro fluxo de mensagem
-        entraFluxoConversa(strChatId, "1")
-        strFluxoAtual     = 1
-        strSequenciaAtual = 1
-
-    else:
-        #Verifica resposta recebida
-        #Traz todas as respostas aceitas daquela sequencia/fluxo atual
-        tabRespostas = selectBanco(objConexao, "SELECT RESPACEITA, IDFLUXOREDIREC FROM RESPOSTAFLUXO WHERE IDFLUXO = '" + strFluxoAtual + "' AND NUMSEQ = '" + strSequenciaAtual + "';")
-        bRespostaAceita = False
-
-        #Loop nas respostas aceitas verificando se ela é igual a resposta recebida
-        if len(tabRespostas) > 0:
-            for linha in tabRespostas:
-                strResposta = linha[0]
-
-                if strResposta == '*':
-                    bRespostaAceita = True
-                    break
-
-                elif strMensagem.upper() == strResposta.upper():
-                    bRespostaAceita = True
-                    break
-
-        if bRespostaAceita:
-            
-            #Responde e continua o fluxo
-            if strFluxoAtual == '5' and strSequenciaAtual == '2':
-                insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATO_LINHA (IDCTT, IDLINHA) VALUES ('" + strChatId + "', '" + strMensagem + "');")
-
-            if strFluxoAtual == '5' and strSequenciaAtual == '4':
-                insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATO_AGENDAMENTOS (IDCTT, HORA) VALUES ('" + strChatId + "', '" + strMensagem + "');")
-
-            continuaFluxo(strChatId)
-        elif len(tabRespostas) == 0:
+        if bPrimeiraMensagem:
+            #Entra no primeiro fluxo de mensagem
             entraFluxoConversa(strChatId, "1")
-        else:
-            enviaMsg(strChatId, 'Nao entendi sua resposta, por favor responda corretamente')
+            strFluxoAtual     = 1
+            strSequenciaAtual = 1
 
-    return "2"
+        else:
+            #Verifica resposta recebida
+            #Traz todas as respostas aceitas daquela sequencia/fluxo atual
+            tabRespostas = selectBanco(objConexao, "SELECT RESPACEITA, IDFLUXOREDIREC FROM RESPOSTAFLUXO WHERE IDFLUXO = '" + strFluxoAtual + "' AND NUMSEQ = '" + strSequenciaAtual + "';")
+            bRespostaAceita = False
+
+            #Loop nas respostas aceitas verificando se ela é igual a resposta recebida
+            if len(tabRespostas) > 0:
+                for linha in tabRespostas:
+                    strResposta = linha[0]
+
+                    if strResposta == '*':
+                        bRespostaAceita = True
+                        break
+
+                    elif strMensagem.upper() == strResposta.upper():
+                        bRespostaAceita = True
+                        break
+
+            if bRespostaAceita:
+                
+                #Responde e continua o fluxo
+                if strFluxoAtual == '5' and strSequenciaAtual == '2':
+                    insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATO_LINHA (IDCTT, IDLINHA) VALUES ('" + strChatId + "', '" + strMensagem + "');")
+
+                if strFluxoAtual == '5' and strSequenciaAtual == '4':
+                    insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATO_AGENDAMENTOS (IDCTT, HORA) VALUES ('" + strChatId + "', '" + strMensagem + "');")
+
+                continuaFluxo(strChatId)
+            elif len(tabRespostas) == 0:
+                entraFluxoConversa(strChatId, "1")
+            else:
+                enviaMsg(strChatId, 'Nao entendi sua resposta, por favor responda corretamente')
+    except:
+        return "ERROR"
+
+    return "OK"
 
 #Funções de fluxo ---------------------------------------------------
 
@@ -109,12 +112,14 @@ def continuaFluxo(strChatId):
     strNumSeq  = str(int(tabBancoDados[0][1]) + 1)
 
     #Busca a mensagem da sequencia atual
-    tabBancoDadosFluxo = selectBanco(objConexao, "SELECT MENSAGEM FROM FLUXOSMSG WHERE IDFLUXO = '" + strIDFluxo + "' AND NUMSEQ = '" + strNumSeq +  "';")
+    tabBancoDadosFluxo = selectBanco(objConexao,  "SELECT MENSAGEM   FROM FLUXOSMSG     WHERE IDFLUXO = '" + strIDFluxo + "' AND NUMSEQ = '" + strNumSeq +  "';")
+    tabBancoDadosBotoes = selectBanco(objConexao, "SELECT RESPACEITA FROM RESPOSTAFLUXO WHERE IDFLUXO = '" + strIDFluxo + "' AND NUMSEQ = '" + strNumSeq +  "' AND BOTAO = 'S';")
 
     if len(tabBancoDadosFluxo) > 0:
         #atualiza para a proxima mensagem
         insertUpdateDeleteBanco(objConexao, "UPDATE CONTATOS SET IDNUMSEQATUAL = '" + strNumSeq + "' WHERE IDCTT = '" + strChatId + "'")
-        enviaMsg(strChatId, str(tabBancoDadosFluxo[0][0]))
+        #enviaMsg(strChatId, str(tabBancoDadosFluxo[0][0]))
+        enviaMsgBotao(strChatId, str(tabBancoDadosFluxo[0][0]), tabBancoDadosBotoes)
     else:
         entraFluxoConversa(strChatId, "1")
         
@@ -136,7 +141,40 @@ def enviaMsg(strChatId, strMensagem):
         data = data.encode("utf-8")
 
         resposta = requests.post(url, headers=headers, data=data)
-        insertUpdateDeleteBanco(objConexao, "INSERT INTO LOG (RETORNO, ETAPA) VALUES ('" + str(resposta) + "', 'Sucesso');")
+        #insertUpdateDeleteBanco(objConexao, "INSERT INTO LOG (RETORNO, ETAPA) VALUES ('" + str(resposta) + "', 'Sucesso');")
+    except:
+        insertUpdateDeleteBanco(objConexao, "INSERT INTO LOG (RETORNO, ETAPA) VALUES ('Ocorreu um erro', 'Erro');")
+
+    return "ok"
+
+def enviaMsgBotao(strChatId, strMensagem, tabBancoDados):
+    try:
+        url = "https://api.telegram.org/bot5751250760:AAG6Fs7zjgKKG8u9S_1BkO53Tn6z5u5C4XI/sendMessage"
+
+        headers = CaseInsensitiveDict()
+        headers["Content-Type"] = "application/json"
+
+        strBotoes = ''
+        if len(tabBancoDados) == 0:
+            data = '{"chat_id":"' + strChatId + '","text":"' + strMensagem + '"}'
+        else:
+
+            data = '{"chat_id":"' + strChatId + '","text":"' + strMensagem + '","reply_markup":{"keyboard":['
+
+            for linha in tabBancoDados:
+                strBotoes = strBotoes + '[{"text":"'+ linha[0] +'"}]' + ","
+
+            data = data + strBotoes
+            data = data + ']}}'
+
+            data = data.replace(",]}}", "]}}")
+
+            #insertUpdateDeleteBanco(objConexao, "INSERT INTO LOG (RETORNO, ETAPA) VALUES ('" + str(data) + "', 'Sucesso');")
+
+        data = data.encode("utf-8")
+
+        resposta = requests.post(url, headers=headers, data=data)
+        #insertUpdateDeleteBanco(objConexao, "INSERT INTO LOG (RETORNO, ETAPA) VALUES ('" + str(resposta) + "', 'Sucesso');")
     except:
         insertUpdateDeleteBanco(objConexao, "INSERT INTO LOG (RETORNO, ETAPA) VALUES ('Ocorreu um erro', 'Erro');")
 
