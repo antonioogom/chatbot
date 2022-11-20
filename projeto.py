@@ -13,6 +13,7 @@ objConexao = mysql.connector.connect(host='botuni9.c3cupjqiyqbn.sa-east-1.rds.am
 @app.route('/webhook', methods = ['POST'])
 def webhook():
 
+
     try:
         dicionario = request.get_json()
 
@@ -51,7 +52,8 @@ def webhook():
             #Loop nas respostas aceitas verificando se ela é igual a resposta recebida
             if len(tabRespostas) > 0:
                 for linha in tabRespostas:
-                    strResposta = linha[0]
+                    strResposta          = linha[0]
+                    strRedirecionarFluxo = linha[1]
 
                     if strResposta == '*':
                         bRespostaAceita = True
@@ -62,19 +64,23 @@ def webhook():
                         break
 
             if bRespostaAceita:
+                if strRedirecionarFluxo == None:                
+                    #Responde e continua o fluxo
+                    if strFluxoAtual == '5' and strSequenciaAtual == '2':
+                        insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATO_LINHA (IDCTT, IDLINHA) VALUES ('" + strChatId + "', '" + strMensagem + "');")
+
+                    if strFluxoAtual == '5' and strSequenciaAtual == '4':
+                        insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATO_AGENDAMENTOS (IDCTT, HORA) VALUES ('" + strChatId + "', '" + strMensagem + "');")
+        
+                    continuaFluxo(strChatId)
+                else:
+                    #insertUpdateDeleteBanco(objConexao, "INSERT INTO LOG (RETORNO, ETAPA) VALUES ('Vai redirecionar', 'Erro');")
+                    entraFluxoConversa(strChatId, strRedirecionarFluxo)
                 
-                #Responde e continua o fluxo
-                if strFluxoAtual == '5' and strSequenciaAtual == '2':
-                    insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATO_LINHA (IDCTT, IDLINHA) VALUES ('" + strChatId + "', '" + strMensagem + "');")
-
-                if strFluxoAtual == '5' and strSequenciaAtual == '4':
-                    insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATO_AGENDAMENTOS (IDCTT, HORA) VALUES ('" + strChatId + "', '" + strMensagem + "');")
-
-                continuaFluxo(strChatId)
             elif len(tabRespostas) == 0:
                 entraFluxoConversa(strChatId, "1")
             else:
-                enviaMsg(strChatId, 'Nao entendi sua resposta, por favor responda corretamente')
+                enviaMsg(strChatId, 'Nao entendi sua resposta, por favor responda corretamente.')
     except:
         return "ERROR"
 
@@ -96,12 +102,14 @@ def guardaMensagem(strChatId, strMensagem, strNomeCtt):
     insertUpdateDeleteBanco(objConexao, "INSERT INTO MENSAGENS_RECEBIDAS (IDCTT, MENSAGEM, NOMECTT) VALUES ('" + strChatId + "', '" + strMensagem + "', '" + strNomeCtt + "');")
 
 def entraFluxoConversa(strChatId, strIDFluxo):
+    strIDFluxo = str(strIDFluxo)
     #registrar na tabela contatos o fluxo
     insertUpdateDeleteBanco(objConexao, "DELETE FROM CONTATOS WHERE IDCTT = '" + strChatId + "';")
-    insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATOS (IDCTT, IDFLUXOATUAL, IDNUMSEQATUAL) VALUES ('" + strChatId + "', " + strIDFluxo + ", 1);")
-    tabBancoDados = selectBanco(objConexao, "SELECT MENSAGEM FROM FLUXOSMSG WHERE IDFLUXO = '" + strIDFluxo + "' AND NUMSEQ = '1';")
+    insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATOS (IDCTT, IDFLUXOATUAL, IDNUMSEQATUAL) VALUES ('" + strChatId + "', " + str(strIDFluxo) + ", 1);")
+    tabBancoDados       = selectBanco(objConexao, "SELECT MENSAGEM   FROM FLUXOSMSG     WHERE IDFLUXO = '" + strIDFluxo + "' AND NUMSEQ = '1';")
+    tabBancoDadosBotoes = selectBanco(objConexao, "SELECT RESPACEITA FROM RESPOSTAFLUXO WHERE IDFLUXO = '" + strIDFluxo + "' AND NUMSEQ = '1' AND BOTAO = 'S';")
 
-    enviaMsg(strChatId, str(tabBancoDados[0][0]))
+    enviaMsgBotao(strChatId, str(tabBancoDados[0][0]), tabBancoDadosBotoes)
 
     return "ok"
 
@@ -156,7 +164,7 @@ def enviaMsgBotao(strChatId, strMensagem, tabBancoDados):
 
         strBotoes = ''
         if len(tabBancoDados) == 0:
-            data = '{"chat_id":"' + strChatId + '","text":"' + strMensagem + '"}'
+            data = '{"chat_id":"' + strChatId + '","text":"' + strMensagem + '", "reply_markup":{"remove_keyboard":true}}'
         else:
 
             data = '{"chat_id":"' + strChatId + '","text":"' + strMensagem + '","reply_markup":{"keyboard":['
@@ -206,6 +214,18 @@ def insertUpdateDeleteBanco(objConexao, strQuery):
         
     return "ok"
 
+def guardaStatusMetro():
+    request = requests.get("https://www.diretodostrens.com.br/api/status")
+
+    conteudo = request.json()
+
+    for linha in conteudo:
+
+        #insertUpdateDeleteBanco(objConexao, "INSERT INTO STATUS_METRO (CODIGO, SITUACAO) VALUES ('" + str(linha['codigo']) +  "', '" + str(linha['situacao']) +  "');")
+        insertUpdateDeleteBanco(objConexao, "UPDATE STATUS_METRO SET SITUACAO = '" + str(linha['situacao']) +  "', DTATUALIZACAO = CURRENT_TIMESTAMP WHERE CODIGO = '" + str(linha['codigo']) +  "';")
+
+#if objConexao.is_connected():
+    #objConexao.close()
 
 if __name__ == "__main__":
     app.run(debug=True)
