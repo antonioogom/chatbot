@@ -1,6 +1,7 @@
 from flask import Flask, request
 import requests, mysql.connector
 from requests.structures import CaseInsensitiveDict
+import re
 
 app = Flask(__name__)
 
@@ -50,7 +51,7 @@ def webhook():
         else:
             #Se não for a primeira mensagem, irá continua uma conversa
             #Traz todas as respostas aceitas daquela sequencia/fluxo que o usuário está
-            tabRespostas = selectBanco(objConexao, "SELECT RESPACEITA, IDFLUXOREDIREC, VALOR, REPETIR FROM RESPOSTAFLUXO WHERE IDFLUXO = '" + strFluxoAtual + "' AND NUMSEQ = '" + strSequenciaAtual + "';")
+            tabRespostas = selectBanco(objConexao, "SELECT RESPACEITA, IDFLUXOREDIREC, VALOR, REPETIR FROM FLUXOS_RESPOSTAS WHERE IDFLUXO = '" + strFluxoAtual + "' AND NUMSEQ = '" + strSequenciaAtual + "';")
             bRespostaAceita = False
 
             if len(tabRespostas) > 0:
@@ -76,6 +77,9 @@ def webhook():
                     elif strRedirecionarFluxo == None:
                         #Responde e continua o fluxo
                         #Apaga o horario e rota do contato se ele estiver no fluxo de mudança de rota
+                        if strFluxoAtual == '6':
+                            guardaStatusMetro()
+
                         if (strFluxoAtual == '2' and strSequenciaAtual == '1') or (strFluxoAtual == '7' and strSequenciaAtual == '1'):
                             insertUpdateDeleteBanco(objConexao, "DELETE FROM CONTATO_AGENDAMENTOS WHERE IDCTT = '" + strChatId + "';")
                             insertUpdateDeleteBanco(objConexao, "DELETE FROM CONTATO_LINHA        WHERE IDCTT = '" + strChatId + "';")
@@ -127,11 +131,11 @@ def guardaMensagem(strChatId, strMensagem, strNomeCtt):
 
 def entraFluxoConversa(strChatId, strIDFluxo):
     strIDFluxo = str(strIDFluxo)
-    #registrar na tabela contatos o fluxo
-    insertUpdateDeleteBanco(objConexao, "DELETE FROM CONTATOS WHERE IDCTT = '" + strChatId + "';")
-    insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATOS (IDCTT, IDFLUXOATUAL, IDNUMSEQATUAL) VALUES ('" + strChatId + "', " + str(strIDFluxo) + ", 1);")
-    tabBancoDados       = selectBanco(objConexao, "SELECT MENSAGEM   FROM FLUXOSMSG     WHERE IDFLUXO = '" + strIDFluxo + "' AND NUMSEQ = '1';")
-    tabBancoDadosBotoes = selectBanco(objConexao, "SELECT RESPACEITA FROM RESPOSTAFLUXO WHERE IDFLUXO = '" + strIDFluxo + "' AND NUMSEQ = '1' AND BOTAO = 'S';")
+    #registrar na tabela CONTATO_FLUXOATUAL o fluxo
+    insertUpdateDeleteBanco(objConexao, "DELETE FROM CONTATO_FLUXOATUAL WHERE IDCTT = '" + strChatId + "';")
+    insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATO_FLUXOATUAL (IDCTT, IDFLUXOATUAL, IDNUMSEQATUAL) VALUES ('" + strChatId + "', " + str(strIDFluxo) + ", 1);")
+    tabBancoDados       = selectBanco(objConexao, "SELECT MENSAGEM   FROM FLUXOS_MENSAGENS WHERE IDFLUXO = '" + strIDFluxo + "' AND NUMSEQ = '1';")
+    tabBancoDadosBotoes = selectBanco(objConexao, "SELECT RESPACEITA FROM FLUXOS_RESPOSTAS WHERE IDFLUXO = '" + strIDFluxo + "' AND NUMSEQ = '1' AND BOTAO = 'S';")
 
     enviaMsg(strChatId, str(tabBancoDados[0][0]), tabBancoDadosBotoes)
 
@@ -139,18 +143,18 @@ def continuaFluxo(strChatId, strFluxoAtual, strSequenciaAtual):
     strSequenciaAtual = int(strSequenciaAtual) + 1
     strSequenciaAtual = str(strSequenciaAtual)
     #Busca a mensagem da sequencia atual
-    tabBancoDadosFluxo = selectBanco(objConexao,  "SELECT MENSAGEM   FROM FLUXOSMSG     WHERE IDFLUXO = '" + strFluxoAtual + "' AND NUMSEQ = '" + strSequenciaAtual +  "';")
-    tabBancoDadosBotoes = selectBanco(objConexao, "SELECT RESPACEITA FROM RESPOSTAFLUXO WHERE IDFLUXO = '" + strFluxoAtual + "' AND NUMSEQ = '" + strSequenciaAtual +  "' AND BOTAO = 'S';")
+    tabBancoDadosFluxo = selectBanco(objConexao,  "SELECT MENSAGEM   FROM FLUXOS_MENSAGENS WHERE IDFLUXO = '" + strFluxoAtual + "' AND NUMSEQ = '" + strSequenciaAtual +  "';")
+    tabBancoDadosBotoes = selectBanco(objConexao, "SELECT RESPACEITA FROM FLUXOS_RESPOSTAS WHERE IDFLUXO = '" + strFluxoAtual + "' AND NUMSEQ = '" + strSequenciaAtual +  "' AND BOTAO = 'S';")
 
     if len(tabBancoDadosFluxo) > 0:
         #atualiza para a proxima mensagem
-        insertUpdateDeleteBanco(objConexao, "UPDATE CONTATOS SET IDNUMSEQATUAL = '" + strSequenciaAtual + "' WHERE IDCTT = '" + strChatId + "'")
+        insertUpdateDeleteBanco(objConexao, "UPDATE CONTATO_FLUXOATUAL SET IDNUMSEQATUAL = '" + strSequenciaAtual + "', DTATUALIZACAO = CURRENT_TIMESTAMP WHERE IDCTT = '" + strChatId + "'")
         enviaMsg(strChatId, str(tabBancoDadosFluxo[0][0]), tabBancoDadosBotoes)
     else:
         entraFluxoConversa(strChatId, "1")
 
 def retornaFluxoAtual(strChatId):
-    tabBancoDados = selectBanco(objConexao, "SELECT IDFLUXOATUAL, IDNUMSEQATUAL FROM CONTATOS WHERE IDCTT = '" + strChatId + "';")
+    tabBancoDados = selectBanco(objConexao, "SELECT IDFLUXOATUAL, IDNUMSEQATUAL FROM CONTATO_FLUXOATUAL WHERE IDCTT = '" + strChatId + "' AND DTATUALIZACAO >= CURRENT_TIMESTAMP()-500;")
 
     return tabBancoDados
 
@@ -184,17 +188,22 @@ def enviaMsg(strChatId, strMensagem, tabBancoDados):
 
         resposta = requests.post(url, headers=headers, data=data)
     except:
-        insertUpdateDeleteBanco(objConexao, "INSERT INTO LOG (RETORNO, ETAPA) VALUES ('Ocorreu um erro', 'Erro');")
+        insertUpdateDeleteBanco(objConexao, "INSERT INTO LOG (RETORNO, ETAPA) VALUES ('Ocorreu um erro na função EnviaMsg', 'Erro');")
 
     return resposta
 
 def guardaStatusMetro():
-    request = requests.get("https://www.diretodostrens.com.br/api/status")
+    tabBancoDados = selectBanco(objConexao, "SELECT NOMELINHA FROM STATUS_METRO WHERE CODIGO = '1' AND DTATUALIZACAO >= CURRENT_TIMESTAMP()-500;")
 
-    conteudo = request.json()
+    if len(tabBancoDados) == 0:
+        try:
+            request = requests.get("https://www.diretodostrens.com.br/api/status")
+            conteudo = request.json()
 
-    for linha in conteudo:
-        insertUpdateDeleteBanco(objConexao, "UPDATE STATUS_METRO SET SITUACAO = '" + str(linha['situacao']) +  "', DTATUALIZACAO = CURRENT_TIMESTAMP WHERE CODIGO = '" + str(linha['codigo']) +  "';")
+            for linha in conteudo:
+                insertUpdateDeleteBanco(objConexao, "UPDATE STATUS_METRO SET SITUACAO = '" + str(linha['situacao']) +  "', DTATUALIZACAO = CURRENT_TIMESTAMP WHERE CODIGO = '" + str(linha['codigo']) +  "';")
+        except:
+            insertUpdateDeleteBanco(objConexao, "INSERT INTO LOG (RETORNO, ETAPA) VALUES ('Ocorreu um erro ao buscar dados da API direto dos trens', 'Erro');")
 
 def substituiVariaveisMensagem(strChatId, strMensagem):
     #Trata as variáveis de mensagem que terão que ser substituídas
@@ -202,6 +211,14 @@ def substituiVariaveisMensagem(strChatId, strMensagem):
         tabVariavelMsg = selectBanco(objConexao, "SELECT NOMECTT FROM MENSAGENS_RECEBIDAS WHERE IDCTT = '" + strChatId + "' ORDER BY IDMSG DESC LIMIT 1;")
         strMensagem = strMensagem.replace("[Nome]", tabVariavelMsg[0][0])
 
+    if strMensagem.count('[Linha]'):
+        tabBancoDados = selectBanco(objConexao, "SELECT MENSAGEM FROM MENSAGENS_RECEBIDAS WHERE IDCTT = '" + strChatId + "' ORDER BY IDMSG DESC LIMIT 1;")
+        strLinha = tabBancoDados[0][0]
+        strLinha = re.sub('[^0-9]', '', strLinha)
+        tabVariavelMsg = selectBanco(objConexao, "SELECT CODIGO, NOMELINHA, SITUACAO FROM STATUS_METRO WHERE CODIGO = '" + str(strLinha) + "';")
+        strCodLinha = (str(tabVariavelMsg[0][0]) + ' - ' + tabVariavelMsg[0][1])
+        strMensagem = strMensagem.replace("[Linha]", strCodLinha)
+        strMensagem = strMensagem.replace("[Status]", tabVariavelMsg[0][2])
 
     return strMensagem
 
@@ -226,9 +243,6 @@ def insertUpdateDeleteBanco(objConexao, strQuery):
         objConexao.commit()
 
         cursor.close()
-
-#if objConexao.is_connected():
-    #objConexao.close()
 
 if __name__ == "__main__":
     app.run(debug = True)
