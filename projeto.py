@@ -76,27 +76,36 @@ def webhook():
                     
                     elif strRedirecionarFluxo == None:
                         #Responde e continua o fluxo
-                        #Apaga o horario e rota do contato se ele estiver no fluxo de mudança de rota
                         if strFluxoAtual == '6':
                             guardaStatusMetro()
 
+                        #Apaga o horario e rota do contato se ele estiver no fluxo de mudança de rota
                         if (strFluxoAtual == '2' and strSequenciaAtual == '1') or (strFluxoAtual == '7' and strSequenciaAtual == '1'):
                             insertUpdateDeleteBanco(objConexao, "DELETE FROM CONTATO_AGENDAMENTOS WHERE IDCTT = '" + strChatId + "';")
                             insertUpdateDeleteBanco(objConexao, "DELETE FROM CONTATO_LINHA        WHERE IDCTT = '" + strChatId + "';")
 
                         #Cadastra a linha para o contato se estiver em algum fluxo de cadastro
-                        if (strFluxoAtual == '5' and strSequenciaAtual == '2') or (strFluxoAtual == '7' and (strSequenciaAtual == '1' or strSequenciaAtual == '2')):
+                        if (strFluxoAtual == '5' and strSequenciaAtual == '1') or (strFluxoAtual == '7' and (strSequenciaAtual == '1' or strSequenciaAtual == '2')):
                             insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATO_LINHA (IDCTT, IDLINHA) VALUES ('" + strChatId + "', '" + strValorMsg + "');")
 
                         #Cadastra o horario para o contato se estiver em algum fluxo de cadastro
-                        if (strFluxoAtual == '5' and strSequenciaAtual == '4') or (strFluxoAtual == '7' and strSequenciaAtual == '3'):
+                        if (strFluxoAtual == '5' and strSequenciaAtual == '3') or (strFluxoAtual == '7' and strSequenciaAtual == '3'):
                             insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATO_AGENDAMENTOS (IDCTT, HORA) VALUES ('" + strChatId + "', '" + strMensagem + "');")
                             bExisteCadastro = True
             
                         continuaFluxo(strChatId, strFluxoAtual, strSequenciaAtual)
                     else:
                         #Redireciona para o fluxo de acordo com o cadastro do banco
-                        entraFluxoConversa(strChatId, strRedirecionarFluxo)
+                        if strRedirecionarFluxo == 1:
+                            bExisteCadastro = verificaCadastro(strChatId)
+
+                            if bExisteCadastro:
+                                entraFluxoConversa(strChatId, "1")
+                            else:
+                                entraFluxoConversa(strChatId, "4")
+                        else:
+                            entraFluxoConversa(strChatId, strRedirecionarFluxo)
+
                 else:
                     enviaMsg(strChatId, 'Nao entendi sua resposta, por favor responda corretamente usando os botões abaixo', '')
             
@@ -206,7 +215,7 @@ def guardaStatusMetro():
             insertUpdateDeleteBanco(objConexao, "INSERT INTO LOG (RETORNO, ETAPA) VALUES ('Ocorreu um erro ao buscar dados da API direto dos trens', 'Erro');")
 
 def substituiVariaveisMensagem(strChatId, strMensagem):
-    #Trata as variáveis de mensagem que terão que ser substituídas
+    #Substitui as chaves/variaveis que estão na mensagem por informações que estão no banco de dados
     if strMensagem.count('[Nome]'):
         tabVariavelMsg = selectBanco(objConexao, "SELECT NOMECTT FROM MENSAGENS_RECEBIDAS WHERE IDCTT = '" + strChatId + "' ORDER BY IDMSG DESC LIMIT 1;")
         strMensagem = strMensagem.replace("[Nome]", tabVariavelMsg[0][0])
@@ -215,10 +224,11 @@ def substituiVariaveisMensagem(strChatId, strMensagem):
         tabBancoDados = selectBanco(objConexao, "SELECT MENSAGEM FROM MENSAGENS_RECEBIDAS WHERE IDCTT = '" + strChatId + "' ORDER BY IDMSG DESC LIMIT 1;")
         strLinha = tabBancoDados[0][0]
         strLinha = re.sub('[^0-9]', '', strLinha)
-        tabVariavelMsg = selectBanco(objConexao, "SELECT CODIGO, NOMELINHA, SITUACAO FROM STATUS_METRO WHERE CODIGO = '" + str(strLinha) + "';")
+        tabVariavelMsg = selectBanco(objConexao, "SELECT CODIGO, NOMELINHA, SITUACAO, DATE_FORMAT(DTATUALIZACAO, '%d/%m às %Hh%i') AS DT FROM STATUS_METRO WHERE CODIGO = '" + str(strLinha) + "';")
         strCodLinha = (str(tabVariavelMsg[0][0]) + ' - ' + tabVariavelMsg[0][1])
         strMensagem = strMensagem.replace("[Linha]", strCodLinha)
         strMensagem = strMensagem.replace("[Status]", tabVariavelMsg[0][2])
+        strMensagem = strMensagem.replace("[DtAtualizacao]", str(tabVariavelMsg[0][3]))
 
     return strMensagem
 
