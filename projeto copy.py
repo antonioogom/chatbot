@@ -25,7 +25,7 @@ def webhook():
         #Guarda a mensagem no Banco de dados
         guardaMensagem(strChatId, strMensagem, strNome)
 
-        #Verifica se é a primeira mensagem que o usuario envia para o bot
+        #Verifica se é a primeira mensagem que o contato envia para o bot
         bPrimeiraMensagem = True
         tabFluxoAtual     = retornaFluxoAtual(strChatId)
 
@@ -36,6 +36,7 @@ def webhook():
 
         #Separa os caminhos caso seja a primeira mensagem ou caso o usuario já esteve em uma conversa
         if bPrimeiraMensagem:
+
             #Verifica se o usuário está cadastrado
             bExisteCadastro = verificaCadastro(strChatId)
 
@@ -43,68 +44,52 @@ def webhook():
             if bExisteCadastro:
                 #Entra no primeiro fluxo de mensagem
                 entraFluxoConversa(strChatId, "1")
+                strFluxoAtual     = 1
+                strSequenciaAtual = 1
             else:
                 #Entra no primeiro fluxo de mensagem
                 entraFluxoConversa(strChatId, "4")
-
+                strFluxoAtual     = 4
+                strSequenciaAtual = 1
+            
         else:
             #Se não for a primeira mensagem, irá continua uma conversa
             #Traz todas as respostas aceitas daquela sequencia/fluxo que o usuário está
-            tabRespostas = selectBanco(objConexao, "SELECT RESPACEITA, IDFLUXOREDIREC, VALOR, REPETIR FROM RESPOSTAFLUXO WHERE IDFLUXO = '" + strFluxoAtual + "' AND NUMSEQ = '" + strSequenciaAtual + "';")
+            tabRespostas = selectBanco(objConexao, "SELECT RESPACEITA, IDFLUXOREDIREC FROM RESPOSTAFLUXO WHERE IDFLUXO = '" + strFluxoAtual + "' AND NUMSEQ = '" + strSequenciaAtual + "';")
             bRespostaAceita = False
 
+            #Loop nas respostas aceitas verificando se ela é igual a resposta recebida
             if len(tabRespostas) > 0:
-                #Loop nas respostas aceitas verificando se ela é igual a resposta recebida
                 for linha in tabRespostas:
                     strResposta          = linha[0]
                     strRedirecionarFluxo = linha[1]
-                    strValorMsg          = str(linha[2])
-                    strRepetirMsg        = str(linha[3])
 
                     if strResposta == '*':
                         bRespostaAceita = True
                         break
+
                     elif strMensagem.upper() == strResposta.upper():
                         bRespostaAceita = True
                         break
+
+            if bRespostaAceita:
+                if strRedirecionarFluxo == None:                
+                    #Responde e continua o fluxo
+                    if strFluxoAtual == '5' and strSequenciaAtual == '2':
+                        insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATO_LINHA (IDCTT, IDLINHA) VALUES ('" + strChatId + "', '" + strMensagem + "');")
+
+                    if strFluxoAtual == '5' and strSequenciaAtual == '4':
+                        insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATO_AGENDAMENTOS (IDCTT, HORA) VALUES ('" + strChatId + "', '" + strMensagem + "');")
+        
+                    continuaFluxo(strChatId)
+                else:
+                    #Redireciona para o fluxo de acordo com o cadastro do banco
+                    entraFluxoConversa(strChatId, strRedirecionarFluxo)
                 
-                #Se a resposta
-                if bRespostaAceita:
-                    if strRepetirMsg == 'S':
-                        continuaFluxo(strChatId, strFluxoAtual, int(strSequenciaAtual)-2)
-                    
-                    elif strRedirecionarFluxo == None:
-                        #Responde e continua o fluxo
-                        #Apaga o horario e rota do contato se ele estiver no fluxo de mudança de rota
-                        if (strFluxoAtual == '2' and strSequenciaAtual == '1') or (strFluxoAtual == '7' and strSequenciaAtual == '1'):
-                            insertUpdateDeleteBanco(objConexao, "DELETE FROM CONTATO_AGENDAMENTOS WHERE IDCTT = '" + strChatId + "';")
-                            insertUpdateDeleteBanco(objConexao, "DELETE FROM CONTATO_LINHA        WHERE IDCTT = '" + strChatId + "';")
-
-                        #Cadastra a linha para o contato se estiver em algum fluxo de cadastro
-                        if (strFluxoAtual == '5' and strSequenciaAtual == '2') or (strFluxoAtual == '7' and (strSequenciaAtual == '1' or strSequenciaAtual == '2')):
-                            insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATO_LINHA (IDCTT, IDLINHA) VALUES ('" + strChatId + "', '" + strValorMsg + "');")
-
-                        #Cadastra o horario para o contato se estiver em algum fluxo de cadastro
-                        if (strFluxoAtual == '5' and strSequenciaAtual == '4') or (strFluxoAtual == '7' and strSequenciaAtual == '3'):
-                            insertUpdateDeleteBanco(objConexao, "INSERT INTO CONTATO_AGENDAMENTOS (IDCTT, HORA) VALUES ('" + strChatId + "', '" + strMensagem + "');")
-                            bExisteCadastro = True
-            
-                        continuaFluxo(strChatId, strFluxoAtual, strSequenciaAtual)
-                    else:
-                        #Redireciona para o fluxo de acordo com o cadastro do banco
-                        entraFluxoConversa(strChatId, strRedirecionarFluxo)
-                else:
-                    enviaMsg(strChatId, 'Nao entendi sua resposta, por favor responda corretamente usando os botões abaixo', '')
-            
+            elif len(tabRespostas) == 0:
+                entraFluxoConversa(strChatId, "1")
             else:
-                #Verifica se o usuário está cadastrado
-                bExisteCadastro = verificaCadastro(strChatId)
-
-                #Se a mensagem atual não tiver nenhuma resposta aceita, então o bot volta para o fluxo de menú
-                if bExisteCadastro:
-                    entraFluxoConversa(strChatId, "1")
-                else:
-                    entraFluxoConversa(strChatId, "4")
+                enviaMsgBotao(strChatId, 'Nao entendi sua resposta, por favor responda corretamente.', '')
     except:
         return "ERROR"
 
@@ -133,33 +118,54 @@ def entraFluxoConversa(strChatId, strIDFluxo):
     tabBancoDados       = selectBanco(objConexao, "SELECT MENSAGEM   FROM FLUXOSMSG     WHERE IDFLUXO = '" + strIDFluxo + "' AND NUMSEQ = '1';")
     tabBancoDadosBotoes = selectBanco(objConexao, "SELECT RESPACEITA FROM RESPOSTAFLUXO WHERE IDFLUXO = '" + strIDFluxo + "' AND NUMSEQ = '1' AND BOTAO = 'S';")
 
-    enviaMsg(strChatId, str(tabBancoDados[0][0]), tabBancoDadosBotoes)
+    enviaMsgBotao(strChatId, str(tabBancoDados[0][0]), tabBancoDadosBotoes)
 
-def continuaFluxo(strChatId, strFluxoAtual, strSequenciaAtual):
-    strSequenciaAtual = int(strSequenciaAtual) + 1
-    strSequenciaAtual = str(strSequenciaAtual)
+    return "ok"
+
+def continuaFluxo(strChatId):
+    #Verifica o fluxo atual
+    tabBancoDados = retornaFluxoAtual(strChatId)
+    strIDFluxo = str(tabBancoDados[0][0])
+    strNumSeq  = str(int(tabBancoDados[0][1]) + 1)
+
     #Busca a mensagem da sequencia atual
-    tabBancoDadosFluxo = selectBanco(objConexao,  "SELECT MENSAGEM   FROM FLUXOSMSG     WHERE IDFLUXO = '" + strFluxoAtual + "' AND NUMSEQ = '" + strSequenciaAtual +  "';")
-    tabBancoDadosBotoes = selectBanco(objConexao, "SELECT RESPACEITA FROM RESPOSTAFLUXO WHERE IDFLUXO = '" + strFluxoAtual + "' AND NUMSEQ = '" + strSequenciaAtual +  "' AND BOTAO = 'S';")
+    tabBancoDadosFluxo = selectBanco(objConexao,  "SELECT MENSAGEM   FROM FLUXOSMSG     WHERE IDFLUXO = '" + strIDFluxo + "' AND NUMSEQ = '" + strNumSeq +  "';")
+    tabBancoDadosBotoes = selectBanco(objConexao, "SELECT RESPACEITA FROM RESPOSTAFLUXO WHERE IDFLUXO = '" + strIDFluxo + "' AND NUMSEQ = '" + strNumSeq +  "' AND BOTAO = 'S';")
 
     if len(tabBancoDadosFluxo) > 0:
         #atualiza para a proxima mensagem
-        insertUpdateDeleteBanco(objConexao, "UPDATE CONTATOS SET IDNUMSEQATUAL = '" + strSequenciaAtual + "' WHERE IDCTT = '" + strChatId + "'")
-        enviaMsg(strChatId, str(tabBancoDadosFluxo[0][0]), tabBancoDadosBotoes)
+        insertUpdateDeleteBanco(objConexao, "UPDATE CONTATOS SET IDNUMSEQATUAL = '" + strNumSeq + "' WHERE IDCTT = '" + strChatId + "'")
+        #enviaMsg(strChatId, str(tabBancoDadosFluxo[0][0]))
+        enviaMsgBotao(strChatId, str(tabBancoDadosFluxo[0][0]), tabBancoDadosBotoes)
     else:
         entraFluxoConversa(strChatId, "1")
+        
+    return "ok"
 
 def retornaFluxoAtual(strChatId):
     tabBancoDados = selectBanco(objConexao, "SELECT IDFLUXOATUAL, IDNUMSEQATUAL FROM CONTATOS WHERE IDCTT = '" + strChatId + "';")
 
     return tabBancoDados
 
-def enviaMsg(strChatId, strMensagem, tabBancoDados):
-    try:
-        resposta = "null"
+def enviaMsg(strChatId, strMensagem):
 
-        strMensagem = substituiVariaveisMensagem(strChatId, strMensagem)
-        
+    try:
+        url = "https://api.telegram.org/bot5751250760:AAG6Fs7zjgKKG8u9S_1BkO53Tn6z5u5C4XI/sendMessage"
+
+        headers = CaseInsensitiveDict()
+        headers["Content-Type"] = "application/json"
+        data = '{"chat_id":"' + strChatId + '","text":"' + strMensagem + '"}'
+        data = data.encode("utf-8")
+
+        resposta = requests.post(url, headers=headers, data=data)
+        #insertUpdateDeleteBanco(objConexao, "INSERT INTO LOG (RETORNO, ETAPA) VALUES ('" + str(resposta) + "', 'Sucesso');")
+    except:
+        insertUpdateDeleteBanco(objConexao, "INSERT INTO LOG (RETORNO, ETAPA) VALUES ('Ocorreu um erro', 'Erro');")
+
+    return "ok"
+
+def enviaMsgBotao(strChatId, strMensagem, tabBancoDados):
+    try:
         url = "https://api.telegram.org/bot5751250760:AAG6Fs7zjgKKG8u9S_1BkO53Tn6z5u5C4XI/sendMessage"
 
         headers = CaseInsensitiveDict()
@@ -186,31 +192,15 @@ def enviaMsg(strChatId, strMensagem, tabBancoDados):
     except:
         insertUpdateDeleteBanco(objConexao, "INSERT INTO LOG (RETORNO, ETAPA) VALUES ('Ocorreu um erro', 'Erro');")
 
-    return resposta
-
-def guardaStatusMetro():
-    request = requests.get("https://www.diretodostrens.com.br/api/status")
-
-    conteudo = request.json()
-
-    for linha in conteudo:
-        insertUpdateDeleteBanco(objConexao, "UPDATE STATUS_METRO SET SITUACAO = '" + str(linha['situacao']) +  "', DTATUALIZACAO = CURRENT_TIMESTAMP WHERE CODIGO = '" + str(linha['codigo']) +  "';")
-
-def substituiVariaveisMensagem(strChatId, strMensagem):
-    #Trata as variáveis de mensagem que terão que ser substituídas
-    if strMensagem.count('[Nome]'):
-        tabVariavelMsg = selectBanco(objConexao, "SELECT NOMECTT FROM MENSAGENS_RECEBIDAS WHERE IDCTT = '" + strChatId + "' ORDER BY IDMSG DESC LIMIT 1;")
-        strMensagem = strMensagem.replace("[Nome]", tabVariavelMsg[0][0])
-
-
-    return strMensagem
+    return "ok"
 
 #Funções de Banco de Dados ------------------------------------------
 
 def selectBanco(objConexao, strQuery):
-    
-    if objConexao.is_connected():
-        cursor = objConexao.cursor()
+    con = objConexao
+
+    if con.is_connected():
+        cursor = con.cursor()
         cursor.execute(strQuery)
         resultado = cursor.fetchall()
 
@@ -219,16 +209,29 @@ def selectBanco(objConexao, strQuery):
         return resultado
 
 def insertUpdateDeleteBanco(objConexao, strQuery):
+    con = objConexao
 
-    if objConexao.is_connected():
-        cursor = objConexao.cursor()
+    if con.is_connected():
+        cursor = con.cursor()
         cursor.execute(strQuery)
-        objConexao.commit()
+        con.commit()
 
         cursor.close()
+        
+    return "ok"
+
+def guardaStatusMetro():
+    request = requests.get("https://www.diretodostrens.com.br/api/status")
+
+    conteudo = request.json()
+
+    for linha in conteudo:
+
+        #insertUpdateDeleteBanco(objConexao, "INSERT INTO STATUS_METRO (CODIGO, SITUACAO) VALUES ('" + str(linha['codigo']) +  "', '" + str(linha['situacao']) +  "');")
+        insertUpdateDeleteBanco(objConexao, "UPDATE STATUS_METRO SET SITUACAO = '" + str(linha['situacao']) +  "', DTATUALIZACAO = CURRENT_TIMESTAMP WHERE CODIGO = '" + str(linha['codigo']) +  "';")
 
 #if objConexao.is_connected():
     #objConexao.close()
 
 if __name__ == "__main__":
-    app.run(debug = True)
+    app.run(debug=True)
