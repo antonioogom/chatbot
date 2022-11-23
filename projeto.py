@@ -210,7 +210,10 @@ def guardaStatusMetro():
             conteudo = request.json()
 
             for linha in conteudo:
-                insertUpdateDeleteBanco(objConexao, "UPDATE STATUS_METRO SET SITUACAO = '" + str(linha['situacao']) +  "', DTATUALIZACAO = CURRENT_TIMESTAMP WHERE CODIGO = '" + str(linha['codigo']) +  "';")
+                try:
+                    insertUpdateDeleteBanco(objConexao, "UPDATE STATUS_METRO SET SITUACAO = '" + str(linha['situacao']) +  "', DTATUALIZACAO = CURRENT_TIMESTAMP, DESCRICAO = '" + str(linha['descricao']) +  "' WHERE CODIGO = '" + str(linha['codigo']) +  "';")
+                except:
+                    insertUpdateDeleteBanco(objConexao, "UPDATE STATUS_METRO SET SITUACAO = '" + str(linha['situacao']) +  "', DTATUALIZACAO = CURRENT_TIMESTAMP, DESCRICAO = NULL WHERE CODIGO = '" + str(linha['codigo']) +  "';")
         except:
             insertUpdateDeleteBanco(objConexao, "INSERT INTO LOG (RETORNO, ETAPA) VALUES ('Ocorreu um erro ao buscar dados da API direto dos trens', 'Erro');")
 
@@ -224,10 +227,15 @@ def substituiVariaveisMensagem(strChatId, strMensagem):
         tabBancoDados = selectBanco(objConexao, "SELECT MENSAGEM FROM MENSAGENS_RECEBIDAS WHERE IDCTT = '" + strChatId + "' ORDER BY IDMSG DESC LIMIT 1;")
         strLinha = tabBancoDados[0][0]
         strLinha = re.sub('[^0-9]', '', strLinha)
-        tabVariavelMsg = selectBanco(objConexao, "SELECT CODIGO, NOMELINHA, SITUACAO, DATE_FORMAT(DTATUALIZACAO, '%d/%m às %Hh%i') AS DT FROM STATUS_METRO WHERE CODIGO = '" + str(strLinha) + "';")
+        tabVariavelMsg = selectBanco(objConexao, "SELECT CODIGO, NOMELINHA, SITUACAO, DATE_FORMAT(DTATUALIZACAO, '%d/%m às %Hh%i') AS DT, DESCRICAO FROM STATUS_METRO WHERE CODIGO = '" + str(strLinha) + "';")
         strCodLinha = (str(tabVariavelMsg[0][0]) + ' - ' + tabVariavelMsg[0][1])
         strMensagem = strMensagem.replace("[Linha]", strCodLinha)
-        strMensagem = strMensagem.replace("[Status]", tabVariavelMsg[0][2])
+
+        if str(tabVariavelMsg[0][4]) == None:
+            strMensagem = strMensagem.replace("[Status]", tabVariavelMsg[0][2])
+        else:
+            strMensagem = strMensagem.replace("[Status]", tabVariavelMsg[0][4])
+
         strMensagem = strMensagem.replace("[DtAtualizacao]", str(tabVariavelMsg[0][3]))
 
     return strMensagem
