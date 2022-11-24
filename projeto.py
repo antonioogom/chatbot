@@ -231,7 +231,8 @@ def substituiVariaveisMensagem(strChatId, strMensagem):
         strCodLinha = (str(tabVariavelMsg[0][0]) + ' - ' + tabVariavelMsg[0][1])
         strMensagem = strMensagem.replace("[Linha]", strCodLinha)
 
-        if str(tabVariavelMsg[0][4]) == None:
+        print(tabVariavelMsg[0][4])
+        if str(tabVariavelMsg[0][4]) == "None":
             strMensagem = strMensagem.replace("[Status]", tabVariavelMsg[0][2])
         else:
             strMensagem = strMensagem.replace("[Status]", tabVariavelMsg[0][4])
