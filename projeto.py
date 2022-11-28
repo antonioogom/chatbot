@@ -1,3 +1,5 @@
+#Importação de biblotecas -------------------------------------------
+
 from flask import Flask, request
 import requests, mysql.connector
 from requests.structures import CaseInsensitiveDict
@@ -9,7 +11,7 @@ app = Flask(__name__)
 
 objConexao = mysql.connector.connect(host='botuni9.c3cupjqiyqbn.sa-east-1.rds.amazonaws.com', database='ChatBot', user='admin', password='7pPdu#GSX.2sYG')
 
-#Páginas ------------------------------------------------------------
+#Algoritmo da API ---------------------------------------------------
 
 @app.route('/webhook', methods = ['POST'])
 def webhook():
@@ -231,7 +233,6 @@ def substituiVariaveisMensagem(strChatId, strMensagem):
         strCodLinha = (str(tabVariavelMsg[0][0]) + ' - ' + tabVariavelMsg[0][1])
         strMensagem = strMensagem.replace("[Linha]", strCodLinha)
 
-        print(tabVariavelMsg[0][4])
         if str(tabVariavelMsg[0][4]) == "None":
             strMensagem = strMensagem.replace("[Status]", tabVariavelMsg[0][2])
         else:
