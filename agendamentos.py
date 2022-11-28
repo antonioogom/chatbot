@@ -140,6 +140,8 @@ def substituiSituacaoMensagem(strMensagem, strLinha):
 
     return strMensagem
 
+insertUpdateDeleteBanco(objConexao, "INSERT INTO LOG (RETORNO, ETAPA) VALUES ('JOB iniciado', 'Sucesso');")
+
 guardaStatusMetro()
 
 tabContatosAgendados = selectBanco(objConexao, "SELECT DISTINCT IDCTT FROM CONTATO_AGENDAMENTOS WHERE HOUR(HORA) = HOUR(CURRENT_TIME());")
